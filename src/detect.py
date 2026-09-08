@@ -15,3 +15,29 @@ url = f"rtsp://{username}:{password}@{ip}:{port}/h264Preview_01_sub"
 
 model = YOLO("models/yolo26n.pt",verbose="true") #safe in models folder 
 
+cap = cv2.VideoCapture(url)
+
+if not cap.isOpened():
+    raise RuntimeError("Camera opening error")
+
+print("Connected to Camera")
+
+
+while True:
+    ret, frame = cap.read()
+
+    if not ret:
+        print("Got no frame")
+        break
+
+    results = model(frame)
+
+    for result in results:
+        for box in result.boxes:
+            class_id = int(box.cls[0])
+            confidence = float(box.conf[0])
+
+            if class_id == 0:
+                print(f"Person detected ({confidence:.2f})")
+
+cap.release()
