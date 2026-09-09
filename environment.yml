@@ -10,3 +10,4 @@ dependencies:
       - opencv-python
       - ultralytics
       - python-dotenv
+      - flask
