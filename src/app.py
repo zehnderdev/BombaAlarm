@@ -12,11 +12,8 @@ running = True
 def camera_reader():
     global latest_frame
     while running:
-        ret, frame = read()
+        frame = read()
 
-        if not ret:
-            print("Camera read failed")
-            continue
 
         with frame_lock:
             latest_frame = frame
