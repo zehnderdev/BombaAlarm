@@ -3,6 +3,7 @@ import os
 from urllib.parse import quote
 from dotenv import load_dotenv
 from ultralytics import YOLO
+import numpy as np
 
 load_dotenv()
 
@@ -36,62 +37,63 @@ keypoint_names = [
 ]
 
 BED_ZONE = (
-    110,  # x1
-    270,  # y1
-    500,  # x2
-    460,  # y2
+    (210,230),  # top left
+    (495,228),  # top right
+    (495,375),  # bottom right
+    (150,330),  # bottom left
 )
 
 def is_in_bed(x, y):
-    x1, y1, x2, y2 = BED_ZONE
+    points = np.array(BED_ZONE, np.float32)
 
-    return x1 <= x <= x2 and y1 <= y <= y2
-cap = cv2.VideoCapture(url)
+    return cv2.pointPolygonTest(points,(float(x), float(y)),False) >= 0
 
-if not cap.isOpened():
-    raise RuntimeError("Camera opening error")
-
-print("Connected to Camera")
 
 def detect(frame):
-    results = model(frame)
-    return results[0].plot()
-    
-# while True:
-#     ret, frame = cap.read()
+    results = model(frame,device=0)
+    frame = results[0].plot()
 
-#     if not ret:
-#         print("Got no frame")
-#         break
+    points = np.array(BED_ZONE, np.int32)
+    cv2.polylines(frame, [points], True, (255, 0, 0), 2)
+
+    for result in results:
+        for box in result.boxes:
+            if int(box.cls[0]) != 0:
+                continue
+
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+            center_x = (x1 + x2) // 2
+            center_y = (y1 + y2) // 2
+
+            if is_in_bed(center_x, center_y):
+                state = "IN BED"
+            else:
+                state = "OUT OF BED"
+
+            cv2.putText(frame,state,(x1, y1 - 10),cv2.FONT_HERSHEY_SIMPLEX,0.8,(0, 255, 0),2)
+
+    return frame
+
+
+# import time
+
+# while True:
+#     start = time.time()
+
+#     ret, frame = cap.read()
+#     camera_time = time.time()
 
 #     results = model(frame)
+#     yolo_time = time.time()
 
-#     for result in results:
-#         for box in result.boxes:
-#             class_id = int(box.cls[0])
-#             confidence = float(box.conf[0])
+#     frame = results[0].plot()
 
-#             if class_id != 0:
-#                 continue
+#     _, buffer = cv2.imencode(".jpg", frame)
+#     encode_time = time.time()
 
-#             x1, y1, x2, y2 = box.xyxy[0]
-
-#             x1 = int(x1)
-#             y1 = int(y1)
-#             x2 = int(x2)
-#             y2 = int(y2)
-
-#             center_x = (x1 + x2) // 2
-#             center_y = (y1 + y2) // 2
-
-#             if is_in_bed(center_x,center_y):
-#                 print("IN_BED")
-#             else:
-#                 print("OUT OF BED")
-            
-#             print(
-#                 f"Person: "
-#                 f"confidence={confidence:.2f}, "
-#                 f"center=({center_x}, {center_y})"
-#             )
-# cap.release()
+#     print(
+#         f"camera={camera_time-start:.3f}s "
+#         f"yolo={yolo_time-camera_time:.3f}s "
+#         f"encode={encode_time-yolo_time:.3f}s"
+#     )
