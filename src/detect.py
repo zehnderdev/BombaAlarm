@@ -75,6 +75,8 @@ def detect(frame):
     points = np.array(BED_ZONE_HIGH, np.int32)
     cv2.polylines(frame, [points], True, (255, 0, 0), 2)
 
+    in_bed = False
+
     for result in results:
         for keypoints ,conf in zip( result.keypoints.xy,result.keypoints.conf):
 
@@ -87,6 +89,7 @@ def detect(frame):
                 hip_y = avg(float(keypoints[11][1]),float(keypoints[12][1])) 
 
                 if is_in_bed(hip_x, hip_y):
+                    in_bed = True
                     state = "IN BED"
                     color = (0, 0, 255)
                 else:
@@ -135,5 +138,5 @@ def detect(frame):
 
             
 
-    return frame
+    return frame, in_bed
 
