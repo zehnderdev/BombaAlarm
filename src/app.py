@@ -7,6 +7,9 @@ from camera import read
 from state import BedState
 from alarm import Alarm
 
+app = Flask("BombaAlarm")
+
+
 latest_frame = None
 frame_lock = threading.Lock()
 running = True
@@ -26,8 +29,65 @@ def camera_reader():
 camera_thread = threading.Thread(target=camera_reader , daemon=True)
 camera_thread.start()
 
-app = Flask("BombaAlarm")
 
+monitoring = False
+monitoring_lock = threading.Lock()
+
+
+def monitoring_loop():
+    global monitoring
+
+    print("Monitoring loop started")
+
+    while True:
+
+        with monitoring_lock:
+            if not monitoring:
+                break
+
+        with frame_lock:
+            if latest_frame is None:
+                continue
+
+            frame = latest_frame.copy()
+
+        frame, in_bed = detect(frame)
+
+        current_state = bed_state.update(in_bed)
+
+        alarm_active = alarm.update(current_state)
+
+        print(f"Monitoring: {in_bed} and Alarm: {alarm_active}"
+        )
+
+
+    print("Monitoring loop stopped")
+
+@app.route("/start-monitoring", methods=["POST"])
+def start_monitoring():
+    global monitoring
+
+    with monitoring_lock:
+
+        if monitoring:
+            return {
+                "status": "already_running"
+            }
+
+        monitoring = True
+
+    thread = threading.Thread(
+        target=monitoring_loop,
+        daemon=True
+    )
+
+    thread.start()
+
+    print("Monitoring started by phone")
+
+    return {
+        "status": "started"
+    }
 
 def generate_frames():
     while True:
@@ -77,10 +137,6 @@ def video():
     return response
 
 
-@app.route("/start-monitoring", methods=["POST"])
-def start_monitoring():
-    print("Monitoring requested by phone")
-    return {"status": "ok"}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000,threaded=True)
