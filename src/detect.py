@@ -12,10 +12,10 @@ BED_ZONE_LOW = (
     (150,330),  # bottom left
 )
 BED_ZONE_HIGH = (
-    (1000,1120),  # top left
-    (2086,1240),  # top right
-    (2007,1854),  # bottom right
-    (670,1525),  # bottom left
+    (640,844),  # top left
+    (2191,750),  # top right
+    (2344,1411),  # bottom right
+    (479,1496),  # bottom left
 )
 
 keypoint_names = [
@@ -43,6 +43,30 @@ def is_in_bed(x, y):
 
     return cv2.pointPolygonTest(points,(float(x), float(y)),False) >= 0
 
+def avg(*args):
+    return sum(args)/ len(args)
+        
+
+def is_lying(keypoints, confidence):
+    # don´t take legs not very visible in bed
+    # take min conf
+    shoulder_conf = min(float(confidence[5]),float(confidence[6]))
+    hip_conf = min(float(confidence[11]),float(confidence[12]))
+
+    if shoulder_conf < 0.5 or hip_conf < 0.5:
+        return False
+
+    shoulder_x = avg(float(keypoints[5][0]),float(keypoints[6][0]))
+    shoulder_y = avg(float(keypoints[5][1]),float(keypoints[6][1]))
+
+    hip_x = avg(float(keypoints[11][0]) ,float(keypoints[12][0]))
+    hip_y = avg(float(keypoints[11][1]) ,float(keypoints[12][1]))
+    # comp angle from arctan
+    
+    angle = np.degrees(np.arctan2(abs(hip_y - shoulder_y), abs(hip_x - shoulder_x)))
+
+    return angle < 45
+
 
 def detect(frame):
     results = model(frame,device=0)
@@ -53,20 +77,54 @@ def detect(frame):
 
     for result in results:
         for keypoints ,conf in zip( result.keypoints.xy,result.keypoints.conf):
-            for i, point in enumerate(keypoints):
-                x, y = map(int, point)
-                confidence = float(conf[i])
 
-                if confidence < 0.5:
-                    continue
+            lying = is_lying(keypoints,conf)
 
-                if x == 0 and y == 0:
-                    continue
+            # if lying and in bed we 
+            if lying:
+                hip_x = avg(float(keypoints[11][0]),float(keypoints[12][0])) 
 
-                name = keypoint_names[i]
-                if debug:
-                    cv2.circle(frame,(x, y),5,(0, 255, 255),-1)
-                    cv2.putText(frame,f"{i}: {name}",(x + 10, y),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0, 255, 255),2)
+                hip_y = avg(float(keypoints[11][1]),float(keypoints[12][1])) 
+
+                if is_in_bed(hip_x, hip_y):
+                    state = "IN BED"
+                    color = (0, 0, 255)
+                else:
+                    state = "UNKNOWN"
+                    color = (0, 255, 255)
+            else:
+                state = "OUT OF BED"
+                color = (0, 255, 0)
+
+            cv2.putText(frame,state,(50, 100),cv2.FONT_HERSHEY_SIMPLEX,2,color,3)
+            # for i, point in enumerate(keypoints):
+
+                # relevant_points = [5, 6, 11, 12]
+
+                # in_bed = 0
+                # for i in relevant_points:
+                #     if float(conf[i]) < 0.5:
+                #         continue
+
+                #     x, y = map(int, keypoints[i])
+
+                #     if is_in_bed(x, y):
+                #         in_bed += 1
+
+                # if in_bed >= 2:
+                #     state = "IN BED"
+                #     color = (0, 0, 255)
+                # else:
+                #     state = "OUT OF BED"
+                #     color = (0, 255, 0)
+                #     x, y = map(int, point)
+                
+
+                
+                # name = keypoint_names[i]
+                # if debug:
+                #     cv2.circle(frame,(x, y),5,(0, 255, 255),-1)
+                #     cv2.putText(frame,f"{i}: {name}",(x + 10, y),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0, 255, 255),2)
                
             # if is_in_bed(center_x, center_y):
             #     state = "IN BED"
