@@ -1,5 +1,6 @@
 import os
 import requests
+import time
 from dotenv import load_dotenv
 
 
@@ -11,7 +12,7 @@ class Alarm:
         self.password = os.getenv("CAMERA_PASSWORD")
         self.active = False
 
-    def _send(self, manual_switch):
+    def _send(self):
         url = f"https://{self.ip}/cgi-bin/api.cgi"
 
         params = {
@@ -29,33 +30,32 @@ class Alarm:
             }
         }]
 
-        response = requests.post(
-            url,
-            params=params,
-            json=payload,
-            verify=False,
-            timeout=3
-        )
+        try:
+            response = requests.post(
+                url,
+                params=params,
+                json=payload,
+                verify=False,
+                timeout=3
+            )
 
-        response.raise_for_status()
-        result = response.json()
+            response.raise_for_status()
 
-        if result[0]["code"] != 0:
-            raise RuntimeError(f"Camera alarm error: {result}")
+        except requests.RequestException as e:
+            print(f"Alarm request failed: {e}")
 
     def start(self):
         if self.active:
             return
 
-        self._send(1)
+        self._send()
         self.active = True
         print("Alarm started")
 
     def stop(self):
         if not self.active:
             return
-
-        self._send(0)
+        # could add something here
         self.active = False
         print("Alarm stopped")
 

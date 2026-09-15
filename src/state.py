@@ -17,18 +17,11 @@ class BedState:
             for timestamp, state in self.history
             if now - timestamp <= self.duration
         ]
+        
+    def getState(self):
         if not self.history:
             return "UNKNOWN"
-
-        in_bed_count = sum(state for _, state in self.history)
-        ratio = in_bed_count / len(self.history)
-
-        if ratio >= self.threshold:
-            return "IN BED"
-
-        return "OUT OF BED"
-
-    def getState(self):
+        
         in_bed_count = sum(state for _, state in self.history)
         ratio = in_bed_count / len(self.history)
 
@@ -36,3 +29,6 @@ class BedState:
             return "IN BED"
         
         return "OUT OF BED"
+
+    def reset(self):
+        self.history.clear()

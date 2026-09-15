@@ -1,5 +1,6 @@
 import cv2
 import threading
+import time
 from flask import Flask,Response,render_template
 
 from detect import detect
@@ -33,35 +34,55 @@ camera_thread.start()
 monitoring = False
 monitoring_lock = threading.Lock()
 
+MEASUREMENT_DURATION = 10
+MEASUREMENT_INTERVAL = 1 * 10
+MEASUREMENT_RETRY = 3
 
 def monitoring_loop():
     global monitoring
-
+    retries = MEASUREMENT_RETRY
     print("Monitoring loop started")
 
-    while True:
+    while retries>0:
+        
+        # reset
+        bed_state.reset()
 
-        with monitoring_lock:
-            if not monitoring:
-                break
+        # 10 Sekunden messen
+        start_time = time.monotonic()
 
-        with frame_lock:
-            if latest_frame is None:
-                continue
+        while time.monotonic() - start_time < MEASUREMENT_DURATION:
 
-            frame = latest_frame.copy()
+            with frame_lock:
+                if latest_frame is None:
+                    continue
 
-        frame, in_bed = detect(frame)
+                frame = latest_frame.copy()
 
-        current_state = bed_state.update(in_bed)
+            frame, in_bed = detect(frame)
 
-        alarm_active = alarm.update(current_state)
+            bed_state.update(in_bed)
 
-        print(f"Monitoring: {in_bed} and Alarm: {alarm_active}"
-        )
+            print(f"Monitoring: {in_bed}")
 
+        current_state = bed_state.getState()
 
+        print(f"Measurement result: {current_state}")
+
+        alarm.update(current_state) # sleeps for 
+        monitoring =alarm.getState()
+        if monitoring is True:
+            print(f"Sleeping for {MEASUREMENT_INTERVAL} sek")
+            time.sleep(MEASUREMENT_INTERVAL)
+        else:
+            retries -= 1
+
+            
+            print(f"{retries}more Retries to deactivate Monitoring loop")
+
+    monitoring = False
     print("Monitoring loop stopped")
+    return
 
 @app.route("/start-monitoring", methods=["POST"])
 def start_monitoring():
