@@ -2,7 +2,7 @@ import cv2
 from ultralytics import YOLO
 import numpy as np
 
-model = YOLO("models/yolo26n-pose.pt",verbose="true") #safe in models folder 
+model = YOLO("models/yolo26n-pose.pt") #safe in models folder 
 
 debug = True    
 BED_ZONE_LOW = (
@@ -69,7 +69,7 @@ def is_lying(keypoints, confidence):
 
 
 def detect(frame):
-    results = model(frame,device=0)
+    results = model(frame,device=0,verbose=False)
     frame = results[0].plot()
 
     points = np.array(BED_ZONE_HIGH, np.int32)

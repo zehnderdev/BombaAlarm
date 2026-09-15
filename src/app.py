@@ -76,5 +76,11 @@ def video():
 
     return response
 
+
+@app.route("/start-monitoring", methods=["POST"])
+def start_monitoring():
+    print("Monitoring requested by phone")
+    return {"status": "ok"}
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000,threaded=True)
