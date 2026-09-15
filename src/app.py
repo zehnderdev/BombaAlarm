@@ -5,13 +5,14 @@ from flask import Flask,Response,render_template
 from detect import detect
 from camera import read
 from state import BedState
+from alarm import Alarm
 
 latest_frame = None
 frame_lock = threading.Lock()
 running = True
 
 bed_state = BedState(duration=20,threshold=0.8)
-
+alarm = Alarm()
 def camera_reader():
     global latest_frame
     while running:
@@ -40,25 +41,20 @@ def generate_frames():
         frame, in_bed = detect(frame)
 
         curr_state = bed_state.update(in_bed)
+        alarm_active = alarm.update(curr_state)
+
+        alarm_text = "ALARM" if alarm_active else "NO ALARM"
 
         cv2.putText(
                     frame,
-                    "Alarm Threshold: ",
-                    (1650, 100),
+                    alarm_text,
+                    (2150, 100),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     2,
-                    (0, 0, 255) if curr_state == "IN BED" else (0, 255, 0),
+                    (0, 0, 255) if alarm_active else (0, 255, 0),
                     3
                 )
-        cv2.putText(
-            frame,
-            curr_state,
-            (2150, 100),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            2,
-            (0, 0, 255) if curr_state == "IN BED" else (0, 255, 0),
-            3
-        )
+        
 
         _, buffer = cv2.imencode(".jpg", frame)
 
