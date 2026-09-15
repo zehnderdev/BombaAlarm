@@ -1,25 +1,9 @@
 import cv2
-import os
 import threading
-from urllib.parse import quote
-from dotenv import load_dotenv
 from flask import Flask,Response,render_template
+
 from detect import detect
-load_dotenv()
-
-username = os.getenv("CAMERA_USERNAME")
-password = quote(os.getenv("CAMERA_PASSWORD", ""), safe="")
-ip = os.getenv("CAMERA_IP")
-port = os.getenv("CAMERA_RTSP_PORT", "554")
-
-url = f"rtsp://{username}:{password}@{ip}:{port}/h264Preview_01_main"
-
-cap = cv2.VideoCapture(url)
-
-if not cap.isOpened():
-    raise RuntimeError("Camera opening error")
-
-print("Connected to Camera")
+from camera import read
 
 latest_frame = None
 frame_lock = threading.Lock()
@@ -28,7 +12,7 @@ running = True
 def camera_reader():
     global latest_frame
     while running:
-        ret, frame = cap.read()
+        ret, frame = read()
 
         if not ret:
             print("Camera read failed")
