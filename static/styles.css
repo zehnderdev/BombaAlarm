@@ -1,0 +1,44 @@
+body { font-family: Arial, sans-serif; margin: 20px; background: #f0f2f5; }
+        h1 { margin-top: 0; }
+        
+        /* Das Dashboard Layout (2 Spalten) */
+        .dashboard { display: flex; gap: 30px; flex-wrap: wrap; }
+        
+        /* Linke Seite: Video */
+        .video-section { flex: 2; min-width: 600px; }
+        #video-stream { 
+            width: 100%;           /* Passt sich dem Container an */
+            max-width: 1000px;     /* Wird optisch nie größer als das */
+            aspect-ratio: 16/9;    /* Hält das 16:9 Format */
+            object-fit: cover;
+            border: 3px solid #333; 
+            border-radius: 8px;
+            background: #000;      /* Schwarzer Hintergrund, wenn kein Bild da ist */
+            display: block;
+        }
+        
+        /* Rechte Seite: Einstellungen */
+        .settings-section { 
+            flex: 1; 
+            min-width: 320px; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .btn { 
+            width: 100%; padding: 12px; background: #007bff; 
+            color: white; border: none; border-radius: 4px; 
+            font-size: 16px; font-weight: bold; cursor: pointer; 
+            margin-top: 10px;
+        }
+        .btn:hover { background: #0056b3; }
+        
+        .section-title { border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 25px; margin-bottom: 15px; }
+        
+        #status-msg { margin-top: 15px; font-weight: bold; color: green; text-align: center; }

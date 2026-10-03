@@ -3,10 +3,80 @@
 
 <head>
     <title>BombaAlarm</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
 <body>
-    <h1>BombaAlarm</h1>
-    <img src="/video">
+    <div align="center"><h1>BombaAlarm</h1></div>
+    <div align="center"{% if active %}style="display: none;"{% endif %} id="setup-form">
+        <h3>Kamera Daten</h3>
+        <div class="form-group">
+            <label>IP-Adresse:</label>
+            <input type="text" id="ip" >
+        </div>
+        <div class="form-group">
+            <label>Port:</label>
+            <input type="text" id="port">
+        </div>
+        <div class="form-group">
+            <label>Username:</label>
+            <input type="text" id="username" >
+        </div>
+        <div class="form-group">
+            <label>Password:</label>
+            <input type="password" id="password">
+        </div>
+        
+        <h3>Oder Optional: Komplette RTSP URL</h3>
+        <div class="form-group">
+            <label>RTSP URL:</label>
+            <input type="text" id="rtsp_url" placeholder="rtsp://...">
+        </div>
+        
+        <button onclick="startCamera()" style="padding: 10px 20px; cursor: pointer;">Verbinden & Stream starten</button>
+    </div>
+
+    <div id="video-container"{% if not active %} style="display: none;"{% endif %}>
+        <h2>Live Stream </h2>
+        <button class="btn" onclick="showSettings()" style="margin-bottom: 15px; background: #eee;">Change Settings</button>
+        <br>
+        <img id="video-stream" src="{% if active %}/video{% endif %}">
+    </div>
+
+    <script>
+
+        function showSettings() {
+            document.getElementById('setup-form').style.display = 'block';
+            document.getElementById('video-container').style.display = 'none';
+        }
+
+        function startCamera() {
+            const ip = document.getElementById('ip').value;
+            const port = document.getElementById('port').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const rtsp_url = document.getElementById('rtsp_url').value;
+
+            fetch('/setup_camera', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip, port, username, password, rtsp_url })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    document.getElementById('setup-form').style.display = 'none';
+                    document.getElementById('video-container').style.display = 'block';
+                    document.getElementById('video-stream').src = '/video';
+                } else {
+                    alert('Error while setting up the camera.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error while connecting to camera.');
+            });
+        }
+    </script>
 </body>
 </html>

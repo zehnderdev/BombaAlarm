@@ -1,49 +1,69 @@
 import cv2
 import threading
 import time
-from flask import Flask,Response,render_template
+import json
+from flask import Flask, Response, render_template, request, jsonify
 
 from detect import detect
-from camera import read
+from camera import CameraStream, connect_from_config
 from state import BedState
 from alarm import Alarm
+from config import *
 
-app = Flask("BombaAlarm")
+import os
+from urllib.parse import quote
+from dotenv import load_dotenv
 
+# // INIT // 
+load_dotenv()
 
-latest_frame = None
-frame_lock = threading.Lock()
-running = True
+camera_stream = None
+config = load_config()
+
+if config:
+    camera_stream = connect_from_config(config)
 
 bed_state = BedState(duration=20,threshold=0.8)
 alarm = Alarm()
-def camera_reader():
-    global latest_frame
-    while running:
-        frame = read()
-
-
-        with frame_lock:
-            latest_frame = frame
-
-
-camera_thread = threading.Thread(target=camera_reader , daemon=True)
-camera_thread.start()
-
-
-monitoring = False
-monitoring_lock = threading.Lock()
 
 MEASUREMENT_DURATION = 10
 MEASUREMENT_INTERVAL = 1 * 10
 MEASUREMENT_RETRY = 3
+app = Flask("BombaAlarm")
+
+# // 
+
+
+@app.route("/setup_camera", methods=["POST"])
+def setup_camera():
+    global camera_stream
+    
+    data = request.json
+
+    save_config(data)
+    if camera_stream is not None:
+        camera_stream.stop()
+        camera_stream = None
+
+    camera_stream = connect_from_config(data)
+    if camera_stream is None:
+        return jsonify({"status": "error", "message": "Failed to connect to camera."}), 400
+    
+    return jsonify({"status": "ok"})
+
 
 def monitoring_loop():
     global monitoring
+
+
+    if camera_stream is None:
+        print("Monitoring loop cannot start: Camera stream is not initialized.")
+        return
+    
     retries = MEASUREMENT_RETRY
     print("Monitoring loop started")
 
-    while retries>0:
+    while retries >0:
         
         # reset
         bed_state.reset()
@@ -53,12 +73,13 @@ def monitoring_loop():
 
         while time.monotonic() - start_time < MEASUREMENT_DURATION:
 
-            with frame_lock:
-                if latest_frame is None:
-                    continue
+            ret, frame = camera_stream.read()
 
-                frame = latest_frame.copy()
-
+            if not ret or frame is None:
+                print("Failed to read frame from camera stream")
+                time.sleep(0.1)
+                continue
+            
             frame, in_bed = detect(frame)
 
             bed_state.update(in_bed)
@@ -68,7 +89,7 @@ def monitoring_loop():
         current_state = bed_state.getState()
 
         print(f"Measurement result: {current_state}")
-
+ 
         alarm.update(current_state) # sleeps for 
         monitoring =alarm.getState()
         if monitoring is True:
@@ -80,48 +101,30 @@ def monitoring_loop():
             
             print(f"{retries}more Retries to deactivate Monitoring loop")
 
+
     monitoring = False
     print("Monitoring loop stopped")
     return
 
-@app.route("/start-monitoring", methods=["POST"])
-def start_monitoring():
-    global monitoring
-
-    with monitoring_lock:
-
-        if monitoring:
-            return {
-                "status": "already_running"
-            }
-
-        monitoring = True
-
-    thread = threading.Thread(
-        target=monitoring_loop,
-        daemon=True
-    )
-
-    thread.start()
-
-    print("Monitoring started by phone")
-
-    return {
-        "status": "started"
-    }
 
 def generate_frames():
     while True:
 
-        with frame_lock:
-            if latest_frame is None:
-                continue
+        if camera_stream is None:
+            time.sleep(1)
+            continue
+        ret, frame = camera_stream.read()
 
-            frame = latest_frame.copy()
+        if not ret or frame is None:
+            print("Failed to read frame from camera stream")
+            time.sleep(0.1)
+            continue
 
-        frame, in_bed = detect(frame)
+        
+        frame, in_bed = detect(frame.copy())
 
-        curr_state = bed_state.update(in_bed)
+        bed_state.update(in_bed)
+        curr_state = bed_state.getState()
         alarm_active = alarm.update(curr_state)
 
         alarm_text = "ALARM" if alarm_active else "NO ALARM"
@@ -136,18 +139,27 @@ def generate_frames():
                     3
                 )
         
-
+        frame = cv2.resize(frame, (1920, 1080))
         _, buffer = cv2.imencode(".jpg", frame)
 
         yield (b"--frame\r\n"b"Content-Type: image/jpeg\r\n\r\n"+ buffer.tobytes()+ b"\r\n")
 
+        time.sleep(0.05)
+
+
+
+
 @app.route("/")
 def index():
-   return render_template("index.html")
+   config = load_config()
+   connected = camera_stream is not None
+   return render_template("index.html",ip=config.get("ip", ""),port=config.get("port", ""),username=config.get("username", ""),password=config.get("password", ""),rtsp_url=config.get("rtsp_url", ""),active=connected)
 
 
 @app.route("/video")
 def video():
+    if camera_stream is None:
+        return "Camera stream not initialized", 503
     response = Response(generate_frames(),mimetype="multipart/x-mixed-replace; boundary=frame")
 
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -156,8 +168,6 @@ def video():
     response.headers["X-Accel-Buffering"] = "no"
 
     return response
-
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000,threaded=True)

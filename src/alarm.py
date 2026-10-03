@@ -26,7 +26,7 @@ class Alarm:
             "param": {
                 "channel": 0,
                 "alarm_mode": "times",
-                "times": 10  # around 2 sec each
+                "times": 5  # around 2 sec each
             }
         }]
 
